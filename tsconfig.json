@@ -3,13 +3,14 @@
     "module": "esnext",
     "target": "esnext",
     "lib": ["esnext", "dom"],
-    "declaration": true,
     "strict": true,
-    "esModuleInterop": true,
+    "declaration": true,
     "moduleResolution": "node",
-    "outDir": "dist",
-    "resolveJsonModule": true,
-    "skipLibCheck": true
+    "outDir": "./dist",
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["**/src/**/*.test.ts", "**/src/**/*.spec.ts", "**/src/**/*.mock.ts"]
 }

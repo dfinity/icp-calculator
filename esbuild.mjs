@@ -1,4 +1,5 @@
 import esbuild from 'esbuild';
+import {writeFileSync} from 'fs';
 import {existsSync, mkdirSync, readFileSync, readdirSync, statSync} from 'node:fs';
 import {join} from 'node:path';
 
@@ -22,7 +23,7 @@ const buildBrowser = (entryPoints) => {
   esbuild
     .build({
       entryPoints,
-      outdir: 'dist',
+      outdir: 'dist/browser',
       bundle: true,
       sourcemap: true,
       minify: true,
@@ -41,7 +42,7 @@ const buildNode = (entryPoints) => {
   esbuild
     .build({
       entryPoints,
-      outdir: 'dist',
+      outdir: 'dist/node',
       bundle: true,
       sourcemap: true,
       minify: true,
@@ -71,9 +72,15 @@ const bundleFiles = () => {
   buildNode(entryPoints);
 };
 
+const writeEntries = () => {
+  // an entry for the browser as default
+  writeFileSync(join(dist, 'index.js'), "export * from './browser/index.js';");
+};
+
 export const build = () => {
   createDistFolder();
   bundleFiles();
+  writeEntries();
 };
 
 build();
