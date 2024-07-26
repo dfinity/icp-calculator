@@ -36,10 +36,14 @@ class CalculatorImpl implements Calculator<Cycles> {
   constructor(subnetType?: SubnetType, subnetSize?: number) {
     this.subnet_type = subnetType ?? DEFAULT_SUBNET_TYPE;
     this.subnet_size = subnetSize ?? DEFAULT_SUBNET_SIZE;
-    this.config =
-      this.subnet_type === SubnetType.Application
-        ? CONFIG.application
-        : CONFIG.system;
+    switch (this.subnet_type) {
+      case SubnetType.Application:
+        this.config = CONFIG.application;
+        break;
+      case SubnetType.System:
+        this.config = CONFIG.system;
+        break;
+    }
   }
 
   storage(size: Bytes, duration: Duration): Cycles {
@@ -54,30 +58,47 @@ class CalculatorImpl implements Calculator<Cycles> {
   execution(mode: Mode, instructions: Instructions): Cycles {
     // The corresponding code in replica:
     // https://github.com/dfinity/ic/blob/1999421a1a54a504d7a14e3d408d1d3cfc08879f/rs/cycles_account_manager/src/lib.rs#L1032
-    if (mode === Mode.NonReplicated) {
-      return 0 as Cycles;
+    switch (mode) {
+      case Mode.NonReplicated:
+        return 0 as Cycles;
+      case Mode.Replicated: {
+        const fees = this.config.fees;
+        const cost =
+          fees.update_message_execution_fee +
+          (fees.ten_update_instructions_execution_fee * instructions) / 10;
+        return this.scale(cost as Cycles);
+      }
     }
-    const fees = this.config.fees;
-    const cost =
-      fees.update_message_execution_fee +
-      (fees.ten_update_instructions_execution_fee * instructions) / 10;
-    return this.scale(cost as Cycles);
   }
 
   message(mode: Mode, direction: Direction, size: Bytes): Cycles {
     // The corresponding code in replica:
     // https://github.com/dfinity/ic/blob/1999421a1a54a504d7a14e3d408d1d3cfc08879f/rs/cycles_account_manager/src/lib.rs#L600
     // https://github.com/dfinity/ic/blob/1999421a1a54a504d7a14e3d408d1d3cfc08879f/rs/cycles_account_manager/src/lib.rs#L728
-    if (mode === Mode.NonReplicated) {
-      return 0 as Cycles;
+
+    // Returns per-message and per-byte fees depending on the direction.
+    function messageFees(
+      fees: typeof CONFIG.application.fees,
+    ): [number, number] {
+      switch (direction) {
+        case Direction.UserToCanister:
+          return [
+            fees.ingress_message_reception_fee,
+            fees.ingress_byte_reception_fee,
+          ];
+        case Direction.CanisterToCanister:
+          return [fees.xnet_call_fee, fees.xnet_byte_transmission_fee];
+      }
     }
-    const fees = this.config.fees;
-    const [messageFee, byteFee] =
-      direction === Direction.UserToCanister
-        ? [fees.ingress_message_reception_fee, fees.ingress_byte_reception_fee]
-        : [fees.xnet_call_fee, fees.xnet_byte_transmission_fee];
-    const cost = messageFee + size * byteFee;
-    return this.scale(cost as Cycles);
+    switch (mode) {
+      case Mode.NonReplicated:
+        return 0 as Cycles;
+      case Mode.Replicated: {
+        const [messageFee, byteFee] = messageFees(this.config.fees);
+        const cost = messageFee + size * byteFee;
+        return this.scale(cost as Cycles);
+      }
+    }
   }
 
   httpOutcall(request: Bytes, response: Bytes): Cycles {
