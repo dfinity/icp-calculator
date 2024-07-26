@@ -49,4 +49,148 @@ bazel run //rs/execution_environment/tools:icp_config -- --replica-version=rc--2
 
 <!-- TSDOC_START -->
 
+### :toolbox: Functions
+
+- [calculator](#gear-calculator)
+- [toUSD](#gear-tousd)
+- [calculators](#gear-calculators)
+
+#### :gear: calculator
+
+Constructs a cost calculator that operates in cycles for the given subnet.
+
+| Function     | Type                                                                                                                                                                 |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `calculator` | `({ subnetType, subnetSize, }: { subnetType?: SubnetType or undefined; subnetSize?: number or undefined; }) => { version: string; calculator: Calculator<Cycles>; }` |
+
+Parameters:
+
+- `subnetType`: - the type of the subnet: application or system.
+- `subnetSize`: - the number of nodes in the subnet.
+
+[:link: Source](https://github.com/dfinity/icp-calculator/tree/main/src/calculator.ts#L24)
+
+#### :gear: toUSD
+
+Constructs a calculator that operates in USD based on a calculator that
+operates in cycles and based on the exchange rate between cycles and USD.
+
+| Function | Type                                                                                                                                                                                |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `toUSD`  | `({ calculatorCycles, cyclesPerUSD, }: { calculatorCycles: Calculator<Cycles>; cyclesPerUSD?: Cycles or undefined; }) => { cyclesPerUSD: Cycles; calculatorUSD: Calculator<USD>; }` |
+
+Parameters:
+
+- `calculatorCycles`: - the base calculator that operates in cycles.
+- `cyclesPerUSD`: - the exchange rate between cycles and USD.
+
+[:link: Source](https://github.com/dfinity/icp-calculator/tree/main/src/usd.ts#L27)
+
+#### :gear: calculators
+
+The main export of the library. It returns cost calculators that operate in
+cycles and USD based on the given options.
+
+| Function      | Type                                              |
+| ------------- | ------------------------------------------------- |
+| `calculators` | `(options?: Options or undefined) => Calculators` |
+
+Parameters:
+
+- `options`: - optional options to configure the calculators.
+
+[:link: Source](https://github.com/dfinity/icp-calculator/tree/main/src/index.ts#L64)
+
+### :factory: Duration
+
+A type that represent time duration.
+
+[:link: Source](https://github.com/dfinity/icp-calculator/tree/main/src/types.ts#L24)
+
+#### Methods
+
+- [asSeconds](#gear-asseconds)
+- [fromSeconds](#gear-fromseconds)
+- [fromHours](#gear-fromhours)
+- [fromDays](#gear-fromdays)
+
+##### :gear: asSeconds
+
+| Method      | Type           |
+| ----------- | -------------- |
+| `asSeconds` | `() => number` |
+
+[:link: Source](https://github.com/dfinity/icp-calculator/tree/main/src/types.ts#L31)
+
+##### :gear: fromSeconds
+
+| Method        | Type                            |
+| ------------- | ------------------------------- |
+| `fromSeconds` | `(seconds: number) => Duration` |
+
+[:link: Source](https://github.com/dfinity/icp-calculator/tree/main/src/types.ts#L35)
+
+##### :gear: fromHours
+
+| Method      | Type                          |
+| ----------- | ----------------------------- |
+| `fromHours` | `(hours: number) => Duration` |
+
+[:link: Source](https://github.com/dfinity/icp-calculator/tree/main/src/types.ts#L39)
+
+##### :gear: fromDays
+
+| Method     | Type                         |
+| ---------- | ---------------------------- |
+| `fromDays` | `(days: number) => Duration` |
+
+[:link: Source](https://github.com/dfinity/icp-calculator/tree/main/src/types.ts#L44)
+
+### :nut_and_bolt: Enum
+
+- [Mode](#gear-mode)
+- [Direction](#gear-direction)
+- [SubnetType](#gear-subnettype)
+
+#### :gear: Mode
+
+A type that represent execution mode:
+
+- replicated execution corresponds to update (and other) calls that are
+  executed on all nodes and go through consensus.
+
+- non-replicated execution corresponds to read-only query calls that are
+  executed on a single node and don't go through consensus.
+
+| Property        | Type | Description |
+| --------------- | ---- | ----------- |
+| `Replicated`    | ``   |             |
+| `NonReplicated` | ``   |             |
+
+#### :gear: Direction
+
+The direction of sending a message:
+
+- user-to-canister: the message is sent by a user to a canister. These
+  messages in replicated execution mode are also known as 'ingress' messages.
+
+- canister-to-canister: the message is sent from a canister to a canister.
+  These messages are also known as cross-canister calls.
+
+| Property             | Type | Description |
+| -------------------- | ---- | ----------- |
+| `UserToCanister`     | ``   |             |
+| `CanisterToCanister` | ``   |             |
+
+#### :gear: SubnetType
+
+The type of a subnet.
+
+Most users will use an application subnet.
+
+| Property      | Type | Description |
+| ------------- | ---- | ----------- |
+| `Application` | ``   |             |
+| `System`      | ``   |             |
+
 <!-- TSDOC_END -->
