@@ -1,13 +1,15 @@
-import {existsSync, readFileSync, writeFileSync} from 'node:fs';
-import {join} from 'node:path';
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 // The suffix we use to publish to npm wip version of the libs
-const SUFFIX = 'next';
+const SUFFIX = "next";
 
-const nextVersion = async ({project, currentVersion}) => {
+const nextVersion = async ({ project, currentVersion }) => {
   const version = `${currentVersion}-${SUFFIX}-${new Date().toISOString().slice(0, 10)}`;
 
-  const {versions} = await (await fetch(`https://registry.npmjs.org/${project}`)).json();
+  const { versions } = await (
+    await fetch(`https://registry.npmjs.org/${project}`)
+  ).json();
 
   // The wip version has never been published
   if (versions[version] === undefined) {
@@ -20,21 +22,21 @@ const nextVersion = async ({project, currentVersion}) => {
 };
 
 const updateVersion = async () => {
-  const project = '@dfinity/icp-calculator';
+  const project = "@dfinity/icp-calculator";
 
-  const packagePath = join(process.cwd(), 'package.json');
+  const packagePath = join(process.cwd(), "package.json");
 
   if (!existsSync(packagePath)) {
     console.log(`Target ${packagePath} does not exist.`);
     return;
   }
 
-  const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
+  const packageJson = JSON.parse(readFileSync(packagePath, "utf-8"));
 
   // Build wip version number
   const version = await nextVersion({
     project,
-    currentVersion: packageJson.version
+    currentVersion: packageJson.version,
   });
 
   writeFileSync(
@@ -42,12 +44,12 @@ const updateVersion = async () => {
     JSON.stringify(
       {
         ...packageJson,
-        version
+        version,
       },
       null,
-      2
+      2,
     ),
-    'utf-8'
+    "utf-8",
   );
 };
 
