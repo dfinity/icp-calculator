@@ -32,9 +32,3 @@ Thumbs.db
 UserInterfaceState.xcuserstate
 
 dist/
-
-# Playwright
-/test-results/
-/playwright-report/
-/blob-report/
-/playwright/.cache/
