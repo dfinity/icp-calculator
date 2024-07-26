@@ -41,7 +41,7 @@
     "build": "tsc --noEmit && node rmdir.mjs && node esbuild.mjs && npm run ts-declaration",
     "lint": "eslint --max-warnings 0 \"src/**/*\"",
     "test": "tsc --noEmit -p ./tsconfig.spec.json && vitest",
-    "docs": "node scripts/docs.mjs && prettier --write packages/**/README.md"
+    "docs": "node scripts/docs.mjs && prettier --write README.md"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
