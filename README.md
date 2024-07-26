@@ -42,3 +42,11 @@ The JSON config file can be updated as follows:
 cd ~/ic
 bazel run //rs/execution_environment/tools:icp_config -- --replica-version=rc--2024-07-25_01-30 --output=~/icp-calculator/src/icp/config.json
 ```
+
+## Documentation
+
+`@dfinity/icp-calculator` exposes following types and functions:
+
+<!-- TSDOC_START -->
+
+<!-- TSDOC_END -->

@@ -40,7 +40,8 @@
     "ts-declaration": "tsc --emitDeclarationOnly --outDir dist/types",
     "build": "tsc --noEmit && node rmdir.mjs && node esbuild.mjs && npm run ts-declaration",
     "lint": "eslint --max-warnings 0 \"src/**/*\"",
-    "test": "tsc --noEmit -p ./tsconfig.spec.json && vitest"
+    "test": "tsc --noEmit -p ./tsconfig.spec.json && vitest",
+    "docs": "node scripts/docs.mjs && prettier --write packages/**/README.md"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
@@ -57,6 +58,7 @@
     "jsdom": "^24.1.1",
     "prettier": "^3.2.5",
     "prettier-plugin-organize-imports": "^3.2.4",
+    "tsdoc-markdown": "^0.6.0",
     "typescript": "^5.3.3",
     "vitest": "^1.5.0"
   },
