@@ -6,6 +6,7 @@ const inputFiles = ["./src/index.ts"];
 
 const buildOptions = {
   repo: { url: "https://github.com/dfinity/icp-calculator" },
+  explore: false,
 };
 
 const markdownOptions = {
@@ -16,5 +17,5 @@ generateDocumentation({
   inputFiles: inputFiles,
   outputFile: "./README.md",
   markdownOptions,
-  buildOptions: { ...buildOptions, explore: true },
+  buildOptions,
 });
