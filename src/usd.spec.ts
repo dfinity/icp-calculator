@@ -33,19 +33,28 @@ class ConstCalculator implements Calculator<Cycles> {
 }
 
 it("should convert storage cost to USD", () => {
-  const [cyclesPerUSD, $] = toUSD(new ConstCalculator(), COST);
+  const { cyclesPerUSD, calculatorUSD: $ } = toUSD({
+    calculatorCycles: new ConstCalculator(),
+    cyclesPerUSD: COST,
+  });
   expect(cyclesPerUSD).toBeCloseTo(COST);
   expect($.storage(10 as Bytes, Duration.fromDays(365))).toBeCloseTo(1);
 });
 
 it("should convert execution cost to USD", () => {
-  const [cyclesPerUSD, $] = toUSD(new ConstCalculator(), COST);
+  const { cyclesPerUSD, calculatorUSD: $ } = toUSD({
+    calculatorCycles: new ConstCalculator(),
+    cyclesPerUSD: COST,
+  });
   expect(cyclesPerUSD).toBeCloseTo(COST);
   expect($.execution(Mode.Replicated, 10 as Instructions)).toBeCloseTo(1);
 });
 
 it("should convert message cost to USD", () => {
-  const [cyclesPerUSD, $] = toUSD(new ConstCalculator(), COST);
+  const { cyclesPerUSD, calculatorUSD: $ } = toUSD({
+    calculatorCycles: new ConstCalculator(),
+    cyclesPerUSD: COST,
+  });
   expect(cyclesPerUSD).toBeCloseTo(COST);
   expect(
     $.message(Mode.Replicated, Direction.UserToCanister, 10 as Bytes),
@@ -53,13 +62,19 @@ it("should convert message cost to USD", () => {
 });
 
 it("should convert message cost to USD", () => {
-  const [cyclesPerUSD, $] = toUSD(new ConstCalculator(), COST);
+  const { cyclesPerUSD, calculatorUSD: $ } = toUSD({
+    calculatorCycles: new ConstCalculator(),
+    cyclesPerUSD: COST,
+  });
   expect(cyclesPerUSD).toBeCloseTo(COST);
   expect($.httpOutcall(10 as Bytes, 20 as Bytes)).toBeCloseTo(1);
 });
 
 it("should convert canister creation cost to USD", () => {
-  const [cyclesPerUSD, $] = toUSD(new ConstCalculator(), COST);
+  const { cyclesPerUSD, calculatorUSD: $ } = toUSD({
+    calculatorCycles: new ConstCalculator(),
+    cyclesPerUSD: COST,
+  });
   expect(cyclesPerUSD).toBeCloseTo(COST);
   expect($.canisterCreation()).toBeCloseTo(1);
 });

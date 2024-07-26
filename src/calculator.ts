@@ -19,24 +19,30 @@ const GiB = 1024 * 1024 * 1024;
  *
  * @param subnetType - the type of the subnet: application or system.
  * @param subnetSize - the number of nodes in the subnet.
- * @returns a tuple consisting of the replica version and the calculator.
+ * @returns an object consisting of the replica version and the calculator.
  */
-export function calculator(
-  subnetType?: SubnetType,
-  subnetSize?: number,
-): [string, Calculator<Cycles>] {
-  return [CONFIG.version, new CalculatorImpl(subnetType, subnetSize)];
+export function calculator({
+  subnetType,
+  subnetSize,
+}: {
+  subnetType?: SubnetType;
+  subnetSize?: number;
+}): { version: string; calculator: Calculator<Cycles> } {
+  return {
+    version: CONFIG.version,
+    calculator: new CalculatorImpl(subnetType, subnetSize),
+  };
 }
 
 class CalculatorImpl implements Calculator<Cycles> {
-  subnet_type: SubnetType;
-  subnet_size: number;
-  config: typeof CONFIG.application;
+  private readonly subnetType: SubnetType;
+  private readonly subnetSize: number;
+  private readonly config: typeof CONFIG.application;
 
   constructor(subnetType?: SubnetType, subnetSize?: number) {
-    this.subnet_type = subnetType ?? DEFAULT_SUBNET_TYPE;
-    this.subnet_size = subnetSize ?? DEFAULT_SUBNET_SIZE;
-    switch (this.subnet_type) {
+    this.subnetType = subnetType ?? DEFAULT_SUBNET_TYPE;
+    this.subnetSize = subnetSize ?? DEFAULT_SUBNET_SIZE;
+    switch (this.subnetType) {
       case SubnetType.Application:
         this.config = CONFIG.application;
         break;
@@ -107,10 +113,10 @@ class CalculatorImpl implements Calculator<Cycles> {
     const fees = this.config.fees;
     const cost =
       (fees.http_request_linear_baseline_fee +
-        fees.http_request_quadratic_baseline_fee * this.subnet_size +
+        fees.http_request_quadratic_baseline_fee * this.subnetSize +
         fees.http_request_per_byte_fee * request +
         fees.http_response_per_byte_fee * response) *
-      this.subnet_size;
+      this.subnetSize;
     // Note that additional scaling is not needed because the formula above
     // already accounts for the subnet size.
     return cost as Cycles;
@@ -126,6 +132,6 @@ class CalculatorImpl implements Calculator<Cycles> {
   scale(value: Cycles): Cycles {
     // The corresponding code in replica:
     // https://github.com/dfinity/ic/blob/1999421a1a54a504d7a14e3d408d1d3cfc08879f/rs/cycles_account_manager/src/lib.rs#L205
-    return ((value * this.subnet_size) / DEFAULT_SUBNET_SIZE) as Cycles;
+    return ((value * this.subnetSize) / DEFAULT_SUBNET_SIZE) as Cycles;
   }
 }

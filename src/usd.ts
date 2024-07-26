@@ -20,18 +20,24 @@ const DEFAULT_CYCLES_PER_USD: Cycles = 755_000_000_000 as Cycles;
  * Constructs a calculator that operates in USD based on a calculator that
  * operates in cycles and based on the exchange rate between cycles and USD.
  *
- * @param calc - the base calculator that operates in cycles.
+ * @param calculatorCycles - the base calculator that operates in cycles.
  * @param cyclesPerUSD  - the exchange rate between cycles and USD.
- * @returns a tuple consisting of the exchange rate and the calculator.
+ * @returns an object consisting of the exchange rate and the calculator.
  */
-export function toUSD(
-  calc: Calculator<Cycles>,
-  cyclesPerUSD?: Cycles,
-): [Cycles, Calculator<USD>] {
+export function toUSD({
+  calculatorCycles,
+  cyclesPerUSD,
+}: {
+  calculatorCycles: Calculator<Cycles>;
+  cyclesPerUSD?: Cycles;
+}): { cyclesPerUSD: Cycles; calculatorUSD: Calculator<USD> } {
+  const calc = calculatorCycles;
   const exchangeRate = cyclesPerUSD ?? DEFAULT_CYCLES_PER_USD;
+
   function asUSD(cycles: Cycles): USD {
     return (cycles / exchangeRate) as USD;
   }
+
   class CostCalculatorUSD implements Calculator<USD> {
     storage(size: Bytes, duration: Duration): USD {
       return asUSD(calc.storage(size, duration));
@@ -53,5 +59,5 @@ export function toUSD(
       return asUSD(calc.canisterCreation());
     }
   }
-  return [exchangeRate, new CostCalculatorUSD()];
+  return { cyclesPerUSD: exchangeRate, calculatorUSD: new CostCalculatorUSD() };
 }

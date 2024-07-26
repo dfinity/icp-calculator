@@ -62,15 +62,18 @@ export interface Calculators {
  * @param options - optional options to configure the calculators.
  */
 export function calculators(options?: Options): Calculators {
-  const [version, calcCycles] = calculator(
-    options?.subnetType,
-    options?.subnetSize,
-  );
-  const [cyclesPerUSD, calcUSD] = toUSD(calcCycles, options?.cyclesPerUSD);
+  const { version, calculator: calculatorCycles } = calculator({
+    subnetType: options?.subnetType,
+    subnetSize: options?.subnetSize,
+  });
+  const { cyclesPerUSD, calculatorUSD } = toUSD({
+    calculatorCycles,
+    cyclesPerUSD: options?.cyclesPerUSD,
+  });
   return {
     version,
-    calculatorCycles: calcCycles,
-    calculatorUSD: calcUSD,
+    calculatorCycles,
+    calculatorUSD,
     cyclesPerUSD,
   };
 }
