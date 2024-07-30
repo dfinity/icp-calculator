@@ -17,11 +17,11 @@ More will be added in the future.
 
 ```bash
 # with npm
-npm install --save-dev @dfinity/icp-calculator
+npm install @dfinity/icp-calculator
 # with pnpm
-pnpm add --save-dev @dfinity/icp-calculator
+pnpm add @dfinity/icp-calculator
 # with yarn
-yarn add -D @dfinity/icp-calculator
+yarn add @dfinity/icp-calculator
 ```
 
 ## Usage
