@@ -13,11 +13,25 @@ Currently it supports the following operations and resources:
 
 More will be added in the future.
 
+## Installation
+
+```bash
+# with npm
+npm install --save-dev @dfinity/icp-calculator
+# with pnpm
+pnpm add --save-dev @dfinity/icp-calculator
+# with yarn
+yarn add -D @dfinity/icp-calculator
+```
+
 ## Usage
 
 See `src/index.spec.ts` for more examples of usage.
 
-```
+```typescript
+import { calculators, Direction, Duration, Mode } from '@dfinity/icp-calculator';
+import type { Bytes, Instructions } from '@dfinity/icp-calculator';
+
 const $ = calculators().calculatorUSD;
 const storage1mb = $.storage(1_000_000 as Bytes, Duration.fromDays(365));
 const execute1b = $.execution(Mode.Replicated, 1_000_000_000 as Instructions);
