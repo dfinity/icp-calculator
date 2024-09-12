@@ -150,6 +150,106 @@ it("should compute canister creation cost on a 34-node subnet", () => {
   expect($.canisterCreation()).toBeCloseTo((0.132 * 34) / 13);
 });
 
+it("should compute compute allocation cost on a 13-node subnet", () => {
+  const cycles = calculators().calculatorCycles;
+  const $ = calculators().calculatorUSD;
+
+  expect(cycles.computeAllocation(1, Duration.fromDays(365))).toBeCloseTo(
+    10_000_000 * 365 * 24 * 3600,
+  );
+  expect($.computeAllocation(1, Duration.fromDays(365))).toBeCloseTo(417.695);
+});
+
+it("should compute compute allocation cost on a 34-node subnet", () => {
+  const cycles = calculators({ subnetSize: 34 }).calculatorCycles;
+  const $ = calculators({ subnetSize: 34 }).calculatorUSD;
+
+  expect(cycles.computeAllocation(1, Duration.fromDays(365))).toBeCloseTo(
+    (10_000_000 * 365 * 24 * 3600 * 34) / 13,
+  );
+  expect($.computeAllocation(1, Duration.fromDays(365))).toBeCloseTo(
+    (417.695 * 34) / 13,
+  );
+});
+
+it("should compute memory allocation cost on a 13-node subnet", () => {
+  const cycles = calculators().calculatorCycles;
+  const $ = calculators().calculatorUSD;
+
+  expect(cycles.memoryAllocation(GiB, Duration.fromDays(365))).toBeCloseTo(
+    127_000 * 365 * 24 * 3600,
+  );
+  expect($.memoryAllocation(GiB, Duration.fromDays(365))).toBeCloseTo(5.305);
+});
+
+it("should compute memory allocation cost on a 34-node subnet", () => {
+  const cycles = calculators({ subnetSize: 34 }).calculatorCycles;
+  const $ = calculators({ subnetSize: 34 }).calculatorUSD;
+
+  expect(cycles.memoryAllocation(GiB, Duration.fromDays(365))).toBeCloseTo(
+    (127_000 * 365 * 24 * 3600 * 34) / 13,
+  );
+  expect($.memoryAllocation(GiB, Duration.fromDays(365))).toBeCloseTo(
+    (5.305 * 34) / 13,
+  );
+});
+
+it("should compute memory allocation cost on a 34-node subnet", () => {
+  const cycles = calculators({ subnetSize: 34 }).calculatorCycles;
+  const $ = calculators({ subnetSize: 34 }).calculatorUSD;
+
+  expect(cycles.memoryAllocation(GiB, Duration.fromDays(365))).toBeCloseTo(
+    (127_000 * 365 * 24 * 3600 * 34) / 13,
+  );
+  expect($.memoryAllocation(GiB, Duration.fromDays(365))).toBeCloseTo(
+    (5.305 * 34) / 13,
+  );
+});
+
+it("should compute ECDSA signing cost on a 13-node subnet", () => {
+  const cycles = calculators().calculatorCycles;
+  const $ = calculators().calculatorUSD;
+
+  expect(cycles.signWithEcdsa(64 as Bytes, 64 as Bytes)).toBeCloseTo(
+    260_000 + 1_000 * (64 + 64) + 10_000_000_000,
+  );
+  expect($.signWithEcdsa(64 as Bytes, 64 as Bytes)).toBeCloseTo(0.0132);
+});
+
+it("should compute ECDSA signing cost on a 34-node subnet", () => {
+  const cycles = calculators({ subnetSize: 34 }).calculatorCycles;
+  const $ = calculators({ subnetSize: 34 }).calculatorUSD;
+
+  expect(cycles.signWithEcdsa(64 as Bytes, 64 as Bytes)).toBeCloseTo(
+    ((260_000 + 1_000 * (64 + 64) + 10_000_000_000) * 34) / 13,
+  );
+  expect($.signWithEcdsa(64 as Bytes, 64 as Bytes)).toBeCloseTo(
+    (0.0132 * 34) / 13,
+  );
+});
+
+it("should compute Schnorr signing cost on a 13-node subnet", () => {
+  const cycles = calculators().calculatorCycles;
+  const $ = calculators().calculatorUSD;
+
+  expect(cycles.signWithSchnorr(64 as Bytes, 64 as Bytes)).toBeCloseTo(
+    260_000 + 1_000 * (64 + 64) + 10_000_000_000,
+  );
+  expect($.signWithSchnorr(64 as Bytes, 64 as Bytes)).toBeCloseTo(0.0132);
+});
+
+it("should compute Schnorr signing cost on a 34-node subnet", () => {
+  const cycles = calculators({ subnetSize: 34 }).calculatorCycles;
+  const $ = calculators({ subnetSize: 34 }).calculatorUSD;
+
+  expect(cycles.signWithSchnorr(64 as Bytes, 64 as Bytes)).toBeCloseTo(
+    ((260_000 + 1_000 * (64 + 64) + 10_000_000_000) * 34) / 13,
+  );
+  expect($.signWithSchnorr(64 as Bytes, 64 as Bytes)).toBeCloseTo(
+    (0.0132 * 34) / 13,
+  );
+});
+
 it("should compute non-replicated mode costs as zero", () => {
   const cycles = calculators().calculatorCycles;
   const $ = calculators().calculatorUSD;

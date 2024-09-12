@@ -126,4 +126,39 @@ export interface Calculator<Currency> {
    * Computes the cost of create one canister.
    */
   canisterCreation: () => Currency;
+
+  /**
+   * Computes the cost of reserving the given amount of compute allocation for
+   * the given duration.
+   * @param percent - the amount of compute allocation represented in percents
+   * of a CPU core.
+   * @param duration - the duration for which the compute allocation is reserved.
+   */
+  computeAllocation: (percent: number, duration: Duration) => Currency;
+
+  /**
+   * Computes the cost of reserving the given amount of storage for the given
+   * duration.
+   * @param size - the number of storage bytes.
+   * @param duration  - the storage duration.
+   */
+  memoryAllocation: (bytes: Bytes, duration: Duration) => Currency;
+
+  /**
+   * Computes the cost calling the `sign_with_ecdsa` endpoint of the management
+   * canister.
+   *
+   * @param args - the total size of arguments.
+   * @param signature  - the size of the result signature.
+   */
+  signWithEcdsa: (args: Bytes, signature: Bytes) => Currency;
+
+  /**
+   * Computes the cost calling the `sign_with_schnorr` endpoint of the management
+   * canister.
+   *
+   * @param args - the total size of arguments.
+   * @param signature  - the size of the result signature.
+   */
+  signWithSchnorr: (args: Bytes, signature: Bytes) => Currency;
 }

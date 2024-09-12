@@ -129,6 +129,49 @@ class CalculatorImpl implements Calculator<Cycles> {
     return this.scale(fees.canister_creation_fee as Cycles);
   }
 
+  computeAllocation(percent: number, duration: Duration): Cycles {
+    // The corresponding code in replica:
+    // https://github.com/dfinity/ic/blob/1999421a1a54a504d7a14e3d408d1d3cfc08879f/rs/cycles_account_manager/src/lib.rs#L544
+    const fees = this.config.fees;
+    const fee = fees.compute_percent_allocated_per_second_fee;
+    const cost = fee * duration.asSeconds() * percent;
+    return this.scale(cost as Cycles);
+  }
+
+  memoryAllocation(bytes: Bytes, duration: Duration): Cycles {
+    // The corresponding code in replica:
+    // https://github.com/dfinity/ic/blob/1a14c58d3148f06a592e5cba738d313af55f087b/rs/cycles_account_manager/src/lib.rs#L285
+    return this.storage(bytes, duration);
+  }
+
+  signWithEcdsa(args: Bytes, signature: Bytes): Cycles {
+    // The corresponding code in replica:
+    // https://github.com/dfinity/ic/blob/1a14c58d3148f06a592e5cba738d313af55f087b/rs/execution_environment/src/execution_environment.rs#L2640
+    const fees = this.config.fees;
+    const fee = fees.ecdsa_signature_fee as Cycles;
+    const bytes = (args + signature) as Bytes;
+    const call = this.message(
+      Mode.Replicated,
+      Direction.CanisterToCanister,
+      bytes,
+    );
+    return (call + this.scale(fee)) as Cycles;
+  }
+
+  signWithSchnorr(args: Bytes, signature: Bytes): Cycles {
+    // The corresponding code in replica:
+    // https://github.com/dfinity/ic/blob/1a14c58d3148f06a592e5cba738d313af55f087b/rs/execution_environment/src/execution_environment.rs#L2640
+    const fees = this.config.fees;
+    const fee = fees.schnorr_signature_fee as Cycles;
+    const bytes = (args + signature) as Bytes;
+    const call = this.message(
+      Mode.Replicated,
+      Direction.CanisterToCanister,
+      bytes,
+    );
+    return (call + this.scale(fee)) as Cycles;
+  }
+
   scale(value: Cycles): Cycles {
     // The corresponding code in replica:
     // https://github.com/dfinity/ic/blob/1999421a1a54a504d7a14e3d408d1d3cfc08879f/rs/cycles_account_manager/src/lib.rs#L205

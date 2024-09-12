@@ -58,6 +58,22 @@ export function toUSD({
     canisterCreation(): USD {
       return asUSD(calc.canisterCreation());
     }
+
+    computeAllocation(percent: number, duration: Duration): USD {
+      return asUSD(calc.computeAllocation(percent, duration));
+    }
+
+    memoryAllocation(bytes: Bytes, duration: Duration): USD {
+      return asUSD(calc.memoryAllocation(bytes, duration));
+    }
+
+    signWithEcdsa(args: Bytes, signature: Bytes): USD {
+      return asUSD(calc.signWithEcdsa(args, signature));
+    }
+
+    signWithSchnorr(args: Bytes, signature: Bytes): USD {
+      return asUSD(calc.signWithSchnorr(args, signature));
+    }
   }
   return { cyclesPerUSD: exchangeRate, calculatorUSD: new CostCalculatorUSD() };
 }
