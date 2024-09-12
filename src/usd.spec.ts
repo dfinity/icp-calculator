@@ -30,6 +30,22 @@ class ConstCalculator implements Calculator<Cycles> {
   canisterCreation(): Cycles {
     return COST;
   }
+
+  computeAllocation(_percent: number, _duration: Duration): Cycles {
+    return COST;
+  }
+
+  memoryAllocation(_bytes: Bytes, _duration: Duration): Cycles {
+    return COST;
+  }
+
+  signWithEcdsa(_args: Bytes, _signature: Bytes): Cycles {
+    return COST;
+  }
+
+  signWithSchnorr(_args: Bytes, _signature: Bytes): Cycles {
+    return COST;
+  }
 }
 
 it("should convert storage cost to USD", () => {
