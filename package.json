@@ -1,6 +1,6 @@
 {
   "name": "@dfinity/icp-calculator",
-  "version": "0.0.5",
+  "version": "0.1.0",
   "description": "A calculator of fees and costs for smart contracts on the Internet Computer Protocol (ICP)",
   "license": "Apache-2.0",
   "type": "module",
