@@ -37,8 +37,8 @@ it("should compute execution cost on a 13-node subnet", () => {
   const mode = Mode.Replicated;
   const instr = 1_000_000 as Instructions;
 
-  expect(cycles.execution(mode, instr)).toBeCloseTo(590_000 + 0.4 * instr);
-  expect($.execution(mode, instr)).toBeCloseTo(1.31e-6, 8);
+  expect(cycles.execution(mode, instr)).toBeCloseTo(5_000_000 + 1 * instr);
+  expect($.execution(mode, instr)).toBeCloseTo(7.947e-6, 8);
 });
 
 it("should compute execution cost on a 34-node subnet", () => {
@@ -49,9 +49,9 @@ it("should compute execution cost on a 34-node subnet", () => {
   const instr = 1_000_000 as Instructions;
 
   expect(cycles.execution(mode, instr)).toBeCloseTo(
-    ((590_000 + 0.4 * instr) * 34) / 13,
+    ((5_000_000 + 1 * instr) * 34) / 13,
   );
-  expect($.execution(mode, instr)).toBeCloseTo((1.31e-6 * 34) / 13, 8);
+  expect($.execution(mode, instr)).toBeCloseTo((7.947e-6 * 34) / 13, 8);
 });
 
 it("should compute user message cost on a 13-node subnet", () => {
@@ -138,16 +138,16 @@ it("should compute canister creation cost on a 13-node subnet", () => {
   const cycles = calculators().calculatorCycles;
   const $ = calculators().calculatorUSD;
 
-  expect(cycles.canisterCreation()).toBeCloseTo(100_000_000_000);
-  expect($.canisterCreation()).toBeCloseTo(0.132);
+  expect(cycles.canisterCreation()).toBeCloseTo(500_000_000_000);
+  expect($.canisterCreation()).toBeCloseTo(0.662);
 });
 
 it("should compute canister creation cost on a 34-node subnet", () => {
   const cycles = calculators({ subnetSize: 34 }).calculatorCycles;
   const $ = calculators({ subnetSize: 34 }).calculatorUSD;
 
-  expect(cycles.canisterCreation()).toBeCloseTo((100_000_000_000 * 34) / 13);
-  expect($.canisterCreation()).toBeCloseTo((0.132 * 34) / 13);
+  expect(cycles.canisterCreation()).toBeCloseTo((500_000_000_000 * 34) / 13);
+  expect($.canisterCreation()).toBeCloseTo((0.662 * 34) / 13);
 });
 
 it("should compute compute allocation cost on a 13-node subnet", () => {
@@ -308,6 +308,6 @@ it("should run the example from README", () => {
     1_000_000 as Bytes,
   );
   expect(storage1mb).toBeCloseTo(0.00494, 5);
-  expect(execute1b).toBeCloseTo(0.00053, 5);
+  expect(execute1b).toBeCloseTo(0.00133, 5);
   expect(send1mb).toBeCloseTo(0.00265, 5);
 });
