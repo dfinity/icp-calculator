@@ -11,7 +11,7 @@ import type {
 
 /**
  * The cycles minting canister offers 1 trillion cycles for 1 XDR.
- * The rate USD/XDR as of July 2024: 1 XDR = 0.755 USD.
+ * The rate USD/XDR as of July 2024: 1 XDR = 1.325 USD.
  * Thus, 1 USD = 755 billion cycles.
  */
 const DEFAULT_CYCLES_PER_USD: Cycles = 755_000_000_000 as Cycles;
