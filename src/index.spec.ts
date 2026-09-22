@@ -323,6 +323,80 @@ it("should default a flexible outcall to the whole subnet", () => {
   );
 });
 
+it("should derive the flexible defaults from the committee, not the subnet", () => {
+  const cycles = calculators().calculatorCycles;
+
+  // A call that narrows its committee to 3 of the 13 nodes requires two thirds
+  // of those 3, not of the subnet, so it can never be priced for delivering
+  // more responses than it has nodes to produce them.
+  const narrowed = {
+    ...USAGE,
+    replication: Replication.Flexible,
+    totalRequests: 3,
+  };
+  expect(cycles.httpOutcallV2(narrowed)).toBe(
+    cycles.httpOutcallV2({
+      ...narrowed,
+      minResponses: 3, // floor(2 / 3 * 3) + 1
+      deliveredResponses: 3,
+    }),
+  );
+
+  // Asking for more responses than the committee can give is held to it.
+  for (const counts of [
+    { minResponses: 9 },
+    { deliveredResponses: 9 },
+    { minResponses: 99, deliveredResponses: 99 },
+  ]) {
+    expect(cycles.httpOutcallV2({ ...narrowed, ...counts })).toBe(
+      cycles.httpOutcallV2(narrowed),
+    );
+  }
+
+  // Leaving the committee unset is still the whole subnet requiring two thirds
+  // of it, which is what the protocol defaults to.
+  expect(
+    cycles.httpOutcallV2({ ...USAGE, replication: Replication.Flexible }),
+  ).toBe(
+    cycles.httpOutcallV2({
+      ...USAGE,
+      replication: Replication.Flexible,
+      totalRequests: 13,
+      minResponses: 9, // floor(2 / 3 * 13) + 1
+    }),
+  );
+});
+
+it("should hold version 2 usage to what the protocol permits", () => {
+  const cycles = calculators().calculatorCycles;
+
+  // Nothing an outcall can consume exceeds these, so usage beyond them
+  // describes a call that could not have happened and is priced as the
+  // largest one that could.
+  const capped = {
+    ...USAGE,
+    response: 2_000_000 as Bytes,
+    delivered: 2_001_024 as Bytes,
+    roundtrip: Duration.fromMillis(60_000),
+    transformInstructions: 5_000_000_000 as Instructions,
+  };
+  expect(
+    cycles.httpOutcallV2({
+      ...USAGE,
+      response: 9_999_999 as Bytes,
+      delivered: 9_999_999 as Bytes,
+      roundtrip: Duration.fromSeconds(600),
+      transformInstructions: 50_000_000_000 as Instructions,
+    }),
+  ).toBe(cycles.httpOutcallV2(capped));
+
+  // Which makes the payment for the maximum usage the largest there is.
+  const max = maxHttpOutcallUsage({ request: 100 as Bytes });
+  expect(cycles.httpOutcallV2Payment(capped)).toBe(
+    cycles.httpOutcallV2Payment({ ...max, request: USAGE.request }),
+  );
+});
+
 it("should not charge version 2 for a flexible outcall that delivers nothing", () => {
   const cycles = calculators().calculatorCycles;
   // Delivering no response requires requiring none, so the base fee carries

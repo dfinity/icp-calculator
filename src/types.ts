@@ -145,20 +145,24 @@ export interface HttpOutcallUsage {
   response: Bytes;
 
   /**
-   * The number of bytes delivered to the canister, i.e. the size of the
-   * response after the transform function has run. Defaults to `response`,
-   * which is what a call without a transform delivers.
+   * The number of bytes of response delivered to the canister, as consensus
+   * carries it: the response the transform returned, Candid-encoded. Defaults
+   * to `response`, which is what a call without a transform delivers.
+   *
+   * A node may deliver a reject rather than the response that was asked for,
+   * so {@link Calculator.httpOutcallV2Payment} reserves for at least a
+   * maximally large one however small a response this is.
    */
   delivered?: Bytes;
 
   /**
-   * How long the request takes to come back. Priced per millisecond and capped
-   * at 60 seconds, the longest the protocol waits. Defaults to zero.
+   * How long the request takes to come back. Priced per millisecond, and held
+   * to 60 seconds, the longest the protocol waits. Defaults to zero.
    */
   roundtrip?: Duration;
 
   /**
-   * The number of instructions the transform function executes, capped at the
+   * The number of instructions the transform function executes, held to the
    * 5 billion instruction limit of a query call. Defaults to zero, which is
    * what a call without a transform is charged.
    */
@@ -179,14 +183,16 @@ export interface HttpOutcallUsage {
   /**
    * How many responses have to agree for the outcall to succeed. Only
    * meaningful for {@link Replication.Flexible}, where it defaults to
-   * `floor(2 / 3 * subnetSize) + 1`.
+   * `floor(2 / 3 * totalRequests) + 1` and is held to `totalRequests`, since
+   * no more responses can be required than there are nodes to produce them.
    */
   minResponses?: number;
 
   /**
    * How many responses are delivered to the canister. Only meaningful for
-   * {@link Replication.Flexible}, where it defaults to `minResponses`. Zero
-   * describes a fire-and-forget call, which delivers nothing.
+   * {@link Replication.Flexible}, where it defaults to `minResponses` and is
+   * held to `totalRequests`. Zero describes a fire-and-forget call, which
+   * delivers nothing.
    */
   deliveredResponses?: number;
 }

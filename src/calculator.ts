@@ -74,6 +74,11 @@ const MAX_HTTP_ROUNDTRIP_TIME_MS = 60_000;
 /** The instruction limit of a query call, which is what a transform runs as. */
 const MAX_TRANSFORM_INSTRUCTIONS = 5_000_000_000;
 
+/** Clamps `value` into the range the protocol permits. */
+function bounded(value: number, max: number): number {
+  return Math.min(Math.max(value, 0), max);
+}
+
 /** Integer division that rounds up, like the replica's `div_ceil`. */
 function divCeil(value: number, divisor: number): number {
   return Math.ceil(value / divisor);
@@ -98,6 +103,10 @@ function canisterHttpThreshold(committeeSize: number): number {
  * Passing the result to `httpOutcallV2Payment` gives the payment that always
  * suffices, which is also the most the protocol withholds while the call is in
  * flight. Anything not spent is refunded.
+ *
+ * The delivered size it reports is `maxResponseBytes` plus the bytes the Candid
+ * encoding of a response may add on top of it, since that encoded size is what
+ * consensus puts into a block.
  *
  * @param args.request - the total serialized size of the request.
  * @param args.maxResponseBytes - the value of `max_response_bytes`, or
@@ -287,32 +296,50 @@ class CalculatorImpl implements Calculator<Cycles> {
     return cost as Cycles;
   }
 
-  /** Fills in every default of `usage`, which needs the subnet size. */
+  /**
+   * Fills in every default of `usage`, which needs the subnet size, and holds
+   * it to what the protocol permits, so that no outcall is priced for more than
+   * it could ever consume or for more responses than it has nodes to produce
+   * them.
+   */
   private resolveUsage(usage: HttpOutcallUsage): ResolvedUsage {
     const n = this.subnetSize;
     const replication = usage.replication ?? Replication.FullyReplicated;
-    const totalRequests = usage.totalRequests ?? n;
-    // A non-replicated outcall is priced as a flexible one that requires a
-    // single response.
-    const minResponses =
-      replication === Replication.NonReplicated
-        ? 1
-        : (usage.minResponses ?? Math.floor((2 * n) / 3) + 1);
     const nodes = {
       [Replication.FullyReplicated]: Math.max(n, 1),
       [Replication.NonReplicated]: 1,
-      [Replication.Flexible]: Math.max(totalRequests, 1),
+      [Replication.Flexible]: Math.max(usage.totalRequests ?? n, 1),
     }[replication];
+    // A non-replicated outcall is priced as a flexible one that requires a
+    // single response. A flexible one that does not say how many responses it
+    // requires takes the two thirds of its committee that the protocol
+    // defaults to, which is the whole subnet unless the call narrowed it.
+    const minResponses =
+      replication === Replication.NonReplicated
+        ? 1
+        : bounded(usage.minResponses ?? Math.floor((2 * nodes) / 3) + 1, nodes);
     return {
       request: usage.request,
-      response: usage.response,
-      delivered: usage.delivered ?? usage.response,
-      roundtripMs: usage.roundtrip?.asMillis() ?? 0,
-      transformInstructions: usage.transformInstructions ?? 0,
+      response: bounded(usage.response, MAX_HTTP_RESPONSE_BYTES),
+      delivered: bounded(
+        usage.delivered ?? usage.response,
+        MAX_HTTP_RESPONSE_BYTES + CANDID_OVERHEAD_RESERVE_BYTES,
+      ),
+      roundtripMs: bounded(
+        usage.roundtrip?.asMillis() ?? 0,
+        MAX_HTTP_ROUNDTRIP_TIME_MS,
+      ),
+      transformInstructions: bounded(
+        usage.transformInstructions ?? 0,
+        MAX_TRANSFORM_INSTRUCTIONS,
+      ),
       replication,
       nodes,
       minResponses,
-      deliveredResponses: usage.deliveredResponses ?? minResponses,
+      deliveredResponses: bounded(
+        usage.deliveredResponses ?? minResponses,
+        nodes,
+      ),
     };
   }
 
