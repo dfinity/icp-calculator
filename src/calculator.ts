@@ -344,11 +344,15 @@ class CalculatorImpl implements Calculator<Cycles> {
       replication === Replication.NonReplicated
         ? 1
         : bounded(usage.minResponses ?? Math.floor((2 * nodes) / 3) + 1, nodes);
+    // A call that says nothing about what it delivers delivers what it
+    // downloaded, which is the response the protocol would have permitted
+    // rather than the one that was asked for.
+    const response = bounded(usage.response, MAX_HTTP_RESPONSE_BYTES);
     return {
       request: bounded(usage.request, MAX_HTTP_REQUEST_BYTES),
-      response: bounded(usage.response, MAX_HTTP_RESPONSE_BYTES),
+      response,
       delivered: bounded(
-        usage.delivered ?? usage.response,
+        usage.delivered ?? response,
         MAX_HTTP_RESPONSE_BYTES + CANDID_OVERHEAD_RESERVE_BYTES,
       ),
       roundtripMs: bounded(

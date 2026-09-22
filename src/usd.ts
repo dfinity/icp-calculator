@@ -52,6 +52,10 @@ export function toUSD({
       return asUSD(calc.message(mode, direction, size));
     }
 
+    /**
+     * @deprecated Version 1 is deprecated; use
+     * {@link Calculator.httpOutcallV2} instead.
+     */
     httpOutcall(request: Bytes, response: Bytes): USD {
       return asUSD(calc.httpOutcall(request, response));
     }

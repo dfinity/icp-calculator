@@ -539,6 +539,43 @@ it("should not carry a usage that is not a number into a price", () => {
   );
 });
 
+it("should deliver what it downloaded when it says nothing else", () => {
+  const cycles = calculators().calculatorCycles;
+
+  // A response beyond the maximum is held to it, so a call that delivers what
+  // it downloaded delivers that, not the maximum plus the bytes an encoding
+  // could have added to a larger one.
+  expect(
+    cycles.httpOutcallV2({
+      ...USAGE,
+      response: 9_999_999 as Bytes,
+      delivered: undefined,
+    }),
+  ).toBe(
+    cycles.httpOutcallV2({
+      ...USAGE,
+      response: 2_000_000 as Bytes,
+      delivered: 2_000_000 as Bytes,
+    }),
+  );
+
+  // Saying so explicitly is a different claim: a transform may hand back more
+  // than arrived, up to what an encoded response may carry.
+  expect(
+    cycles.httpOutcallV2({
+      ...USAGE,
+      response: 9_999_999 as Bytes,
+      delivered: 9_999_999 as Bytes,
+    }),
+  ).toBe(
+    cycles.httpOutcallV2({
+      ...USAGE,
+      response: 2_000_000 as Bytes,
+      delivered: 2_001_024 as Bytes,
+    }),
+  );
+});
+
 it("should not charge version 2 for a flexible outcall that delivers nothing", () => {
   const cycles = calculators().calculatorCycles;
   // Delivering no response requires requiring none, so the base fee carries
