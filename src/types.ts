@@ -21,40 +21,44 @@ export type Bytes = number & { readonly Bytes: unique symbol };
 /**
  * A type that represent time duration.
  */
-export class Duration {
-  private readonly seconds: number;
+const MILLIS_PER_SECOND = 1000;
 
-  private constructor(seconds: number) {
-    this.seconds = seconds;
+export class Duration {
+  /**
+   * Held in milliseconds, the finest unit a duration is constructed in, so
+   * that a whole number of them comes back out as the integer it went in as
+   * and {@link Duration.asMillis} has nothing to correct for.
+   */
+  private readonly millis: number;
+
+  private constructor(millis: number) {
+    this.millis = millis;
   }
 
   asSeconds(): number {
-    return this.seconds;
+    return this.millis / MILLIS_PER_SECOND;
   }
 
   /**
-   * The duration as a whole number of milliseconds, which is the unit the
-   * protocol counts elapsed time in. Rounded, because a duration constructed
-   * from milliseconds is held in seconds and so need not come back out as the
-   * exact integer it went in as.
+   * The whole milliseconds the duration contains, which is both the unit and
+   * the rounding the protocol counts elapsed time in: a response that takes
+   * part of a millisecond longer is not charged for it.
    */
   asMillis(): number {
-    const MILLIS_PER_SECOND = 1000;
-    return Math.round(this.seconds * MILLIS_PER_SECOND);
+    return Math.trunc(this.millis);
   }
 
   static fromSeconds(seconds: number): Duration {
-    return new Duration(seconds);
+    return new Duration(seconds * MILLIS_PER_SECOND);
   }
 
   static fromMillis(millis: number): Duration {
-    const MILLIS_PER_SECOND = 1000;
-    return new Duration(millis / MILLIS_PER_SECOND);
+    return new Duration(millis);
   }
 
   static fromHours(hours: number): Duration {
     const SECONDS_PER_HOUR = 3600;
-    return new Duration(hours * SECONDS_PER_HOUR);
+    return Duration.fromSeconds(hours * SECONDS_PER_HOUR);
   }
 
   static fromDays(days: number): Duration {

@@ -14,9 +14,20 @@ it("should convert Duration to milliseconds", () => {
 });
 
 it("should convert Duration to whole milliseconds", () => {
-  // Milliseconds are held as seconds, so `1_001 / 1_000 * 1_000` is not the
-  // integer it started as and must not come back a millisecond short.
   for (let ms = 0; ms <= 60_000; ms++) {
     expect(Duration.fromMillis(ms).asMillis()).toBe(ms);
   }
+  // Whole seconds are whole milliseconds too.
+  for (let s = 0; s <= 200; s++) {
+    expect(Duration.fromSeconds(s).asMillis()).toBe(s * 1000);
+  }
+});
+
+it("should not count part of a millisecond as one", () => {
+  // The protocol charges the whole milliseconds a response took, so part of
+  // one is not charged, however close to the next it is.
+  expect(Duration.fromSeconds(1.0006).asMillis()).toBe(1000);
+  expect(Duration.fromMillis(1000.9).asMillis()).toBe(1000);
+  expect(Duration.fromMillis(0.9).asMillis()).toBe(0);
+  expect(Duration.fromSeconds(1.0006).asSeconds()).toBeCloseTo(1.0006);
 });
