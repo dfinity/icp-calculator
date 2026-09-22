@@ -4,6 +4,7 @@ import type {
   Cycles,
   Direction,
   Duration,
+  HttpOutcallUsage,
   Instructions,
   Mode,
   USD,
@@ -51,8 +52,20 @@ export function toUSD({
       return asUSD(calc.message(mode, direction, size));
     }
 
+    /**
+     * @deprecated Version 1 is deprecated; use
+     * {@link Calculator.httpOutcallV2} instead.
+     */
     httpOutcall(request: Bytes, response: Bytes): USD {
       return asUSD(calc.httpOutcall(request, response));
+    }
+
+    httpOutcallV2(usage: HttpOutcallUsage): USD {
+      return asUSD(calc.httpOutcallV2(usage));
+    }
+
+    httpOutcallV2Payment(usage: HttpOutcallUsage): USD {
+      return asUSD(calc.httpOutcallV2Payment(usage));
     }
 
     canisterCreation(): USD {

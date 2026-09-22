@@ -8,7 +8,8 @@ Currently it supports the following operations and resources:
 - **storage**: the cost to store some number of bytes for some period of time.
 - **message execution**: the cost to execute some number of instructions.
 - **message sending**: the cost to send some number of bytes as a message.
-- **HTTP outcalls**: the cost to make an HTTP outcall.
+- **HTTP outcalls**: the cost to make an HTTP outcall, under either pricing
+  version and in any of the three replication modes.
 - **canister creation**: the cost to create a canister.
 
 More will be added in the future.
@@ -51,6 +52,71 @@ expect(execute1b).toBeCloseTo(0.00053, 5);
 expect(send1mb).toBeCloseTo(0.00265, 5);
 ```
 
+## HTTP outcall pricing
+
+Outcalls have two pricing versions, which a call chooses through the
+`pricing_version` field of `http_request`.
+
+Version 1, `httpOutcall`, charges for the bytes a call reserves: its request
+size and its `max_response_bytes`. It is still the default, but it is deprecated
+and will be removed once version 2 becomes the default.
+
+Version 2, `httpOutcallV2`, charges for the resources a call actually consumes:
+the bytes that arrive, how long the request took, the instructions its transform
+ran, and the bytes that are delivered. It is also the only pricing available to
+`flexible_http_request`.
+
+```typescript
+import {
+  calculators,
+  Duration,
+  Replication,
+  maxHttpOutcallUsage,
+} from "@dfinity/icp-calculator";
+import type { Bytes, Instructions } from "@dfinity/icp-calculator";
+
+const $ = calculators().calculatorUSD;
+
+// What a call that downloads 100 KB in 2 seconds and delivers 1 KB is charged.
+const charged = $.httpOutcallV2({
+  request: 500 as Bytes,
+  response: 100_000 as Bytes,
+  delivered: 1_000 as Bytes,
+  roundtrip: Duration.fromSeconds(2),
+  transformInstructions: 10_000_000 as Instructions,
+});
+
+// The same call on a committee of 5 nodes, 3 of whose responses are delivered.
+const flexible = $.httpOutcallV2({
+  request: 500 as Bytes,
+  response: 100_000 as Bytes,
+  delivered: 1_000 as Bytes,
+  roundtrip: Duration.fromSeconds(2),
+  replication: Replication.Flexible,
+  totalRequests: 5,
+  minResponses: 3,
+});
+```
+
+Version 2 charges for consumption, so what a call has to _attach_ is larger than
+what it is charged: the payment reserves for the most expensive result the call
+could still produce, and the difference is refunded. `httpOutcallV2Payment`
+computes that payment, which is what `ic0.cost_http_request_v2` reports, and
+`maxHttpOutcallUsage` describes the usage of a call that cannot run short of its
+per-node limits.
+
+```typescript
+// The most a call with an unset `max_response_bytes` can ever be withheld.
+const attach = $.httpOutcallV2Payment(
+  maxHttpOutcallUsage({ request: 500 as Bytes }),
+);
+```
+
+Unlike the version 1 fees, the version 2 ones are not part of the subnet config,
+so they are not in `src/icp/config.json`. They are defined in the replica in
+[`rs/https_outcalls/pricing/src/fees.rs`](https://github.com/dfinity/ic/blob/79fce9ab76b15d1e31a545668300febd6f3c74fc/rs/https_outcalls/pricing/src/fees.rs)
+and mirrored in `src/calculator.ts`.
+
 ## How it works
 
 The main logic of the calculator is in `src/calculator.ts`.
@@ -89,6 +155,6 @@ Parameters:
 
 - `options`: - optional options to configure the calculators.
 
-[:link: Source](https://github.com/dfinity/icp-calculator/tree/main/src/index.ts#L64)
+[:link: Source](https://github.com/dfinity/icp-calculator/tree/main/src/index.ts#L65)
 
 <!-- TSDOC_END -->
