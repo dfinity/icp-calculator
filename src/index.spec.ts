@@ -18,7 +18,7 @@ import {
  *
  * It is the same usage the replica's own `total_fee` tests price, so the
  * expected values below are the ones asserted in
- * https://github.com/dfinity/ic/blob/master/rs/https_outcalls/pricing/src/fees.rs
+ * https://github.com/dfinity/ic/blob/79fce9ab76b15d1e31a545668300febd6f3c74fc/rs/https_outcalls/pricing/src/fees.rs
  */
 const USAGE: HttpOutcallUsage = {
   request: 100 as Bytes,
@@ -394,6 +394,60 @@ it("should hold version 2 usage to what the protocol permits", () => {
   const max = maxHttpOutcallUsage({ request: 100 as Bytes });
   expect(cycles.httpOutcallV2Payment(capped)).toBe(
     cycles.httpOutcallV2Payment({ ...max, request: USAGE.request }),
+  );
+});
+
+it("should price version 2 for a call the protocol could have accepted", () => {
+  const cycles = calculators().calculatorCycles;
+
+  // Bytes, milliseconds, instructions and nodes are whole numbers the protocol
+  // counts in, and none of them can be negative, so usage that is neither is
+  // priced as the call the protocol would have seen.
+  expect(
+    cycles.httpOutcallV2({
+      ...USAGE,
+      request: 100.9 as Bytes,
+      response: 1_000.9 as Bytes,
+      delivered: 2_000.9 as Bytes,
+      transformInstructions: 26.9 as Instructions,
+    }),
+  ).toBe(cycles.httpOutcallV2(USAGE));
+
+  expect(
+    cycles.httpOutcallV2({
+      ...USAGE,
+      request: -100 as Bytes,
+      response: -1_000 as Bytes,
+      delivered: -2_000 as Bytes,
+      roundtrip: Duration.fromMillis(-2_000),
+      transformInstructions: -26 as Instructions,
+    }),
+  ).toBe(
+    cycles.httpOutcallV2({
+      ...USAGE,
+      request: 0 as Bytes,
+      response: 0 as Bytes,
+      delivered: 0 as Bytes,
+      roundtrip: Duration.fromMillis(0),
+      transformInstructions: 0 as Instructions,
+    }),
+  );
+
+  // A request is capped like a response is.
+  expect(cycles.httpOutcallV2({ ...USAGE, request: 9_999_999 as Bytes })).toBe(
+    cycles.httpOutcallV2({ ...USAGE, request: 2_000_000 as Bytes }),
+  );
+
+  // A committee cannot be larger than the subnet, nor smaller than one node.
+  const flexible = { ...USAGE, replication: Replication.Flexible };
+  expect(cycles.httpOutcallV2({ ...flexible, totalRequests: 99 })).toBe(
+    cycles.httpOutcallV2({ ...flexible, totalRequests: 13 }),
+  );
+  expect(cycles.httpOutcallV2({ ...flexible, totalRequests: 0 })).toBe(
+    cycles.httpOutcallV2({ ...flexible, totalRequests: 1 }),
+  );
+  expect(cycles.httpOutcallV2({ ...flexible, totalRequests: 3.9 })).toBe(
+    cycles.httpOutcallV2({ ...flexible, totalRequests: 3 }),
   );
 });
 

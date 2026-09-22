@@ -20,9 +20,11 @@ const GiB = 1024 * 1024 * 1024;
 //
 // Version 2 charges for the resources an outcall consumes instead of the bytes
 // it reserves. Unlike the version 1 fees, these constants are not part of the
-// subnet config, so they are not in `src/icp/config.json`. The corresponding
-// code in replica:
-// https://github.com/dfinity/ic/blob/master/rs/https_outcalls/pricing/src/fees.rs
+// subnet config, so they are not in `src/icp/config.json`, so they are pinned
+// to the replica revision they were read from rather than to its branch. Every
+// value below, and every expected value in the tests, holds at
+// 79fce9ab76b15d1e31a545668300febd6f3c74fc. The corresponding code in replica:
+// https://github.com/dfinity/ic/blob/79fce9ab76b15d1e31a545668300febd6f3c74fc/rs/https_outcalls/pricing/src/fees.rs
 
 // Charged once per request, whatever it goes on to consume.
 const HTTP_REQUEST_BASE_FEE = 1_000_000;
@@ -68,15 +70,21 @@ const CANDID_OVERHEAD_RESERVE_BYTES = 1_024;
  */
 const MAX_HTTP_REJECT_BYTES = 1_025;
 
+/** The largest request the protocol accepts. */
+const MAX_HTTP_REQUEST_BYTES = 2_000_000;
+
 /** The longest the protocol waits for a response. */
 const MAX_HTTP_ROUNDTRIP_TIME_MS = 60_000;
 
 /** The instruction limit of a query call, which is what a transform runs as. */
 const MAX_TRANSFORM_INSTRUCTIONS = 5_000_000_000;
 
-/** Clamps `value` into the range the protocol permits. */
+/**
+ * Clamps `value` into the range the protocol permits, as the whole number of
+ * bytes, milliseconds, instructions or nodes that the protocol counts in.
+ */
 function bounded(value: number, max: number): number {
-  return Math.min(Math.max(value, 0), max);
+  return Math.min(Math.max(Math.trunc(value), 0), max);
 }
 
 /** Integer division that rounds up, like the replica's `div_ceil`. */
@@ -266,7 +274,7 @@ class CalculatorImpl implements Calculator<Cycles> {
   httpOutcallV2(usage: HttpOutcallUsage): Cycles {
     // The corresponding code in replica, `initial_spent` and the per-replica
     // fees charged by the pay-as-you-go tracker:
-    // https://github.com/dfinity/ic/blob/master/rs/https_outcalls/pricing/src/fees.rs
+    // https://github.com/dfinity/ic/blob/79fce9ab76b15d1e31a545668300febd6f3c74fc/rs/https_outcalls/pricing/src/fees.rs
     const u = this.resolveUsage(usage);
     const cost =
       this.baseFeeV2(u) +
@@ -279,7 +287,7 @@ class CalculatorImpl implements Calculator<Cycles> {
 
   httpOutcallV2Payment(usage: HttpOutcallUsage): Cycles {
     // The corresponding code in replica, `total_fee`:
-    // https://github.com/dfinity/ic/blob/master/rs/https_outcalls/pricing/src/fees.rs
+    // https://github.com/dfinity/ic/blob/79fce9ab76b15d1e31a545668300febd6f3c74fc/rs/https_outcalls/pricing/src/fees.rs
     const u = this.resolveUsage(usage);
     // Whatever was asked for, a reject of this size may be delivered instead,
     // and delivering it has to be funded out of the same per-node allowances.
@@ -303,12 +311,16 @@ class CalculatorImpl implements Calculator<Cycles> {
    * them.
    */
   private resolveUsage(usage: HttpOutcallUsage): ResolvedUsage {
-    const n = this.subnetSize;
     const replication = usage.replication ?? Replication.FullyReplicated;
+    const subnetNodes = Math.max(this.subnetSize, 1);
     const nodes = {
-      [Replication.FullyReplicated]: Math.max(n, 1),
+      [Replication.FullyReplicated]: subnetNodes,
       [Replication.NonReplicated]: 1,
-      [Replication.Flexible]: Math.max(usage.totalRequests ?? n, 1),
+      // A committee cannot be larger than the subnet it is drawn from.
+      [Replication.Flexible]: Math.max(
+        bounded(usage.totalRequests ?? subnetNodes, subnetNodes),
+        1,
+      ),
     }[replication];
     // A non-replicated outcall is priced as a flexible one that requires a
     // single response. A flexible one that does not say how many responses it
@@ -319,7 +331,7 @@ class CalculatorImpl implements Calculator<Cycles> {
         ? 1
         : bounded(usage.minResponses ?? Math.floor((2 * nodes) / 3) + 1, nodes);
     return {
-      request: usage.request,
+      request: bounded(usage.request, MAX_HTTP_REQUEST_BYTES),
       response: bounded(usage.response, MAX_HTTP_RESPONSE_BYTES),
       delivered: bounded(
         usage.delivered ?? usage.response,

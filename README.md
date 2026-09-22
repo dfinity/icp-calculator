@@ -114,7 +114,7 @@ const attach = $.httpOutcallV2Payment(
 
 Unlike the version 1 fees, the version 2 ones are not part of the subnet config,
 so they are not in `src/icp/config.json`. They are defined in the replica in
-[`rs/https_outcalls/pricing/src/fees.rs`](https://github.com/dfinity/ic/blob/master/rs/https_outcalls/pricing/src/fees.rs)
+[`rs/https_outcalls/pricing/src/fees.rs`](https://github.com/dfinity/ic/blob/79fce9ab76b15d1e31a545668300febd6f3c74fc/rs/https_outcalls/pricing/src/fees.rs)
 and mirrored in `src/calculator.ts`.
 
 ## How it works
