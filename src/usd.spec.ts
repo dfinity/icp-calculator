@@ -5,6 +5,7 @@ import {
   type Bytes,
   type Calculator,
   type Cycles,
+  type HttpOutcallUsage,
   type Instructions,
 } from "./index";
 import { toUSD } from "./usd";
@@ -24,6 +25,14 @@ class ConstCalculator implements Calculator<Cycles> {
   }
 
   httpOutcall(_request: Bytes, _response: Bytes): Cycles {
+    return COST;
+  }
+
+  httpOutcallV2(_usage: HttpOutcallUsage): Cycles {
+    return COST;
+  }
+
+  httpOutcallV2Payment(_usage: HttpOutcallUsage): Cycles {
     return COST;
   }
 
@@ -77,13 +86,16 @@ it("should convert message cost to USD", () => {
   ).toBeCloseTo(1);
 });
 
-it("should convert message cost to USD", () => {
+it("should convert HTTP outcall cost to USD", () => {
   const { cyclesPerUSD, calculatorUSD: $ } = toUSD({
     calculatorCycles: new ConstCalculator(),
     cyclesPerUSD: COST,
   });
+  const usage = { request: 10 as Bytes, response: 20 as Bytes };
   expect(cyclesPerUSD).toBeCloseTo(COST);
   expect($.httpOutcall(10 as Bytes, 20 as Bytes)).toBeCloseTo(1);
+  expect($.httpOutcallV2(usage)).toBeCloseTo(1);
+  expect($.httpOutcallV2Payment(usage)).toBeCloseTo(1);
 });
 
 it("should convert canister creation cost to USD", () => {

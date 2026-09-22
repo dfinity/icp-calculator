@@ -32,8 +32,18 @@ export class Duration {
     return this.seconds;
   }
 
+  asMillis(): number {
+    const MILLIS_PER_SECOND = 1000;
+    return this.seconds * MILLIS_PER_SECOND;
+  }
+
   static fromSeconds(seconds: number): Duration {
     return new Duration(seconds);
+  }
+
+  static fromMillis(millis: number): Duration {
+    const MILLIS_PER_SECOND = 1000;
+    return new Duration(millis / MILLIS_PER_SECOND);
   }
 
   static fromHours(hours: number): Duration {
@@ -86,6 +96,102 @@ export enum SubnetType {
 }
 
 /**
+ * How many nodes of the subnet perform an HTTP outcall, and how their responses
+ * reach the calling canister.
+ *
+ * The replication of an outcall drives its cost more than any other input, and
+ * only pricing version 2 prices the reduced-replication modes.
+ */
+export enum Replication {
+  /**
+   * Every node performs the outcall and the subnet agrees on a single response
+   * through consensus. This is what `http_request` does by default.
+   */
+  FullyReplicated,
+
+  /**
+   * A single node performs the outcall and its response is delivered without
+   * the subnet agreeing on it, which makes the response untrustworthy.
+   * Corresponds to `http_request` with `is_replicated = false`.
+   */
+  NonReplicated,
+
+  /**
+   * A committee of nodes performs the outcall and several of their responses
+   * are delivered, leaving the canister to reconcile them. Corresponds to
+   * `flexible_http_request`.
+   */
+  Flexible,
+}
+
+/**
+ * The resources a single HTTP outcall consumes, which is what pricing version 2
+ * charges for.
+ *
+ * Every field except the request and response sizes is optional and defaults to
+ * what the protocol assumes when the corresponding field of the request is left
+ * unset.
+ */
+export interface HttpOutcallUsage {
+  /**
+   * The total serialized size of the request: URL, headers, body, and the name
+   * and context of the transform function.
+   */
+  request: Bytes;
+
+  /**
+   * The number of bytes downloaded from the server, before the transform runs.
+   */
+  response: Bytes;
+
+  /**
+   * The number of bytes delivered to the canister, i.e. the size of the
+   * response after the transform function has run. Defaults to `response`,
+   * which is what a call without a transform delivers.
+   */
+  delivered?: Bytes;
+
+  /**
+   * How long the request takes to come back. Priced per millisecond and capped
+   * at 60 seconds, the longest the protocol waits. Defaults to zero.
+   */
+  roundtrip?: Duration;
+
+  /**
+   * The number of instructions the transform function executes, capped at the
+   * 5 billion instruction limit of a query call. Defaults to zero, which is
+   * what a call without a transform is charged.
+   */
+  transformInstructions?: Instructions;
+
+  /**
+   * Which nodes perform the outcall. Defaults to
+   * {@link Replication.FullyReplicated}.
+   */
+  replication?: Replication;
+
+  /**
+   * How many nodes perform the outcall. Only meaningful for
+   * {@link Replication.Flexible}, where it defaults to the subnet size.
+   */
+  totalRequests?: number;
+
+  /**
+   * How many responses have to agree for the outcall to succeed. Only
+   * meaningful for {@link Replication.Flexible}, where it defaults to
+   * `floor(2 / 3 * subnetSize) + 1`.
+   */
+  minResponses?: number;
+
+  /**
+   * How many responses are delivered to the canister. Only meaningful for
+   * {@link Replication.Flexible}, where it defaults to `minResponses`. Zero
+   * describes a fire-and-forget call, which delivers nothing.
+   */
+  deliveredResponses?: number;
+}
+
+/**
  * A cost calculator that operates in the given currency.
  */
 export interface Calculator<Currency> {
@@ -115,12 +221,48 @@ export interface Calculator<Currency> {
   message: (mode: Mode, direction: Direction, size: Bytes) => Currency;
 
   /**
-   * Computes the cost of making an HTTP outcall.
+   * Computes the cost of making an HTTP outcall priced by pricing version 1,
+   * which charges for the bytes a call reserves rather than the ones it uses.
    *
    * @param request - the size of the HTTP request in bytes.
-   * @param response - the size of the HTTP response in bytes.
+   * @param response - the value of `max_response_bytes`, or 2,000,000 if the
+   * call leaves it unset.
+   *
+   * @deprecated Version 1 is still the default, but it is deprecated and will
+   * be removed once version 2 becomes the default. Use
+   * {@link Calculator.httpOutcallV2} instead.
    */
   httpOutcall: (request: Bytes, response: Bytes) => Currency;
+
+  /**
+   * Computes the cost of making an HTTP outcall priced by pricing version 2,
+   * which charges for the resources a call actually consumes. This is what the
+   * call is charged once it settles.
+   *
+   * Version 2 is the only pricing available to `flexible_http_request`, and is
+   * to become the default for `http_request`.
+   *
+   * The usage of a call that reduces replication is assumed to be the same on
+   * every node that performs it, and every node of a flexible committee is
+   * assumed to respond.
+   *
+   * @param usage - the resources the outcall consumes.
+   */
+  httpOutcallV2: (usage: HttpOutcallUsage) => Currency;
+
+  /**
+   * Computes the payment an HTTP outcall priced by pricing version 2 has to
+   * attach, given the usage it declares through the expectation fields of the
+   * request. This is what `ic0.cost_http_request_v2` reports.
+   *
+   * It exceeds what {@link Calculator.httpOutcallV2} charges, because neither
+   * how many nodes will respond nor which result they will produce is known
+   * when the call is made, so the payment reserves for the most expensive
+   * result the call could still produce. The difference is refunded.
+   *
+   * @param usage - the resources the outcall declares it expects to consume.
+   */
+  httpOutcallV2Payment: (usage: HttpOutcallUsage) => Currency;
 
   /**
    * Computes the cost of create one canister.

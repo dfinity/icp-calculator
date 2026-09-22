@@ -2,11 +2,34 @@ import {
   Direction,
   Duration,
   Mode,
+  Replication,
   SubnetType,
   calculators,
+  maxHttpOutcallUsage,
   type Bytes,
+  type HttpOutcallUsage,
   type Instructions,
 } from "./index";
+
+/**
+ * The resource usage the pricing version 2 tests below price: a 100-byte
+ * request whose 1,000-byte response arrived in 2,000 ms, was transformed with
+ * 26 instructions and ended up 2,000 bytes long.
+ *
+ * It is the same usage the replica's own `total_fee` tests price, so the
+ * expected values below are the ones asserted in
+ * https://github.com/dfinity/ic/blob/master/rs/https_outcalls/pricing/src/fees.rs
+ */
+const USAGE: HttpOutcallUsage = {
+  request: 100 as Bytes,
+  response: 1_000 as Bytes,
+  delivered: 2_000 as Bytes,
+  roundtrip: Duration.fromMillis(2_000),
+  transformInstructions: 26 as Instructions,
+};
+
+/** `50 * 1_000 + 300 * 2_000 + floor(26 / 13)`, what one node consumes. */
+const PER_NODE_USAGE_FEE = 650_002;
 
 const GiB = (1024 * 1024 * 1024) as Bytes;
 
@@ -132,6 +155,220 @@ it("should compute HTTP outcall cost on a 34-node subnet", () => {
     171_360_000 + 13_600 * request + 27_200 * response,
   );
   expect($.httpOutcall(request, response)).toBeCloseTo(0.09, 3);
+});
+
+it("should compute the version 2 payment of a fully replicated outcall", () => {
+  const cycles = calculators().calculatorCycles;
+
+  // All 13 nodes produce the same response, whose dissemination is charged as a
+  // consensus fee rather than a per-node gossip fee.
+  //   base fee    = 13 * (1_000_000 + 50*100 + 140_000*13 + 800*13*13) = 38_482_600
+  //   per node    = 13 * 650_002                                       =  8_450_026
+  //   consensus   = ceil(9_490 * 2_000 / 9) * 13                       = 27_415_557
+  expect(cycles.httpOutcallV2Payment(USAGE)).toBe(
+    38_482_600 + 13 * PER_NODE_USAGE_FEE + 27_415_557,
+  );
+});
+
+it("should compute the version 2 payment of a non-replicated outcall", () => {
+  const cycles = calculators().calculatorCycles;
+  const usage = { ...USAGE, replication: Replication.NonReplicated };
+
+  // A single node performs the outcall and gossips its response to all 13
+  // nodes; the base fee is the flexible one with one required response.
+  //   base fee    = 13 * (1_000_000 + 50*100 + 90_000*13 + 2_000*13 + 100_000)
+  //                                                        = 29_913_000
+  //   per node    = 1 * (650_002 + 50*2_000*13)            =  1_950_002
+  //   consensus   = 9_490 * 2_000                          = 18_980_000
+  expect(cycles.httpOutcallV2Payment(usage)).toBe(
+    29_913_000 + (PER_NODE_USAGE_FEE + 50 * 2_000 * 13) + 18_980_000,
+  );
+
+  // The payment is priced for exactly the usage it declares, and one node
+  // either delivers that response or a smaller reject, so there is nothing to
+  // refund.
+  expect(cycles.httpOutcallV2(usage)).toBe(cycles.httpOutcallV2Payment(usage));
+});
+
+it("should compute the version 2 payment of a flexible outcall", () => {
+  const cycles = calculators().calculatorCycles;
+  const usage = {
+    ...USAGE,
+    replication: Replication.Flexible,
+    totalRequests: 3,
+    minResponses: 2,
+  };
+
+  // 3 nodes perform the outcall, 2 of whose responses suffice, so all 3 gossip
+  // their own response and up to 3 responses are delivered, one of them beyond
+  // the 2 that are required.
+  //   base fee    = 13 * (1_000_000 + 50*100 + 90_000*13 + 2_000*13*2 + 100_000*2)
+  //                                                        = 31_551_000
+  //   per node    = 3 * (650_002 + 50*2_000*13)            =  5_850_006
+  //   consensus   = 9_490 * 3 * (181 + 2_000)              = 62_093_070
+  //   extra resp. = (3 - 2) * 13 * (2_000*13 + 100_000)    =  1_638_000
+  expect(cycles.httpOutcallV2Payment(usage)).toBe(
+    31_551_000 +
+      3 * (PER_NODE_USAGE_FEE + 50 * 2_000 * 13) +
+      62_093_070 +
+      1_638_000,
+  );
+
+  // Asking for fewer responses than there are nodes does not lower the payment:
+  // every one of them is still priced for delivering a response, since each
+  // holds only a third of the fee.
+  expect(cycles.httpOutcallV2Payment({ ...usage, deliveredResponses: 2 })).toBe(
+    cycles.httpOutcallV2Payment(usage),
+  );
+
+  // Which is also why delivering a response from every node refunds nothing.
+  expect(cycles.httpOutcallV2({ ...usage, deliveredResponses: 3 })).toBe(
+    cycles.httpOutcallV2Payment(usage),
+  );
+});
+
+it("should price every version 2 response for at least a maximal reject", () => {
+  const cycles = calculators().calculatorCycles;
+
+  // Whatever response size is asked for, a reject of up to 1,025 bytes may be
+  // delivered in its place, so the payment is priced for at least that many.
+  for (const replication of [
+    Replication.FullyReplicated,
+    Replication.NonReplicated,
+    Replication.Flexible,
+  ]) {
+    const floored = cycles.httpOutcallV2Payment({
+      ...USAGE,
+      delivered: 1_025 as Bytes,
+      replication,
+    });
+    for (const delivered of [0, 1, 500, 1_024, 1_025]) {
+      expect(
+        cycles.httpOutcallV2Payment({
+          ...USAGE,
+          delivered: delivered as Bytes,
+          replication,
+        }),
+      ).toBe(floored);
+    }
+  }
+});
+
+it("should charge version 2 for what an outcall consumes", () => {
+  const cycles = calculators().calculatorCycles;
+
+  //   base fee    = 38_482_600, per node = 13 * 650_002, delivery = 9_490 * 2_000
+  const charge = 38_482_600 + 13 * PER_NODE_USAGE_FEE + 18_980_000;
+  expect(cycles.httpOutcallV2(USAGE)).toBe(charge);
+
+  // The charge falls short of the payment, and the difference is refunded.
+  expect(charge).toBeLessThan(cycles.httpOutcallV2Payment(USAGE));
+
+  // Each input is charged at the rate documented for a 13-node subnet.
+  const more = (extra: Partial<HttpOutcallUsage>): number =>
+    cycles.httpOutcallV2({ ...USAGE, ...extra }) - charge;
+  expect(more({ request: 101 as Bytes })).toBe(650);
+  expect(more({ response: 1_001 as Bytes })).toBe(650);
+  expect(more({ roundtrip: Duration.fromMillis(2_001) })).toBe(3_900);
+  expect(more({ transformInstructions: 39 as Instructions })).toBe(13);
+  expect(more({ delivered: 2_001 as Bytes })).toBe(9_490);
+});
+
+it("should charge version 2 per node on a 34-node subnet", () => {
+  const cycles = calculators({ subnetSize: 34 }).calculatorCycles;
+
+  const charge = cycles.httpOutcallV2(USAGE);
+  //   base fee = 34 * (1_000_000 + 50*100 + 140_000*34 + 800*34*34)
+  //   per node = 34 * 650_002, delivery = 34 * (10*34 + 600) * 2_000
+  expect(charge).toBe(
+    34 * (1_000_000 + 50 * 100 + 140_000 * 34 + 800 * 34 * 34) +
+      34 * PER_NODE_USAGE_FEE +
+      34 * (10 * 34 + 600) * 2_000,
+  );
+
+  const more = (extra: Partial<HttpOutcallUsage>): number =>
+    cycles.httpOutcallV2({ ...USAGE, ...extra }) - charge;
+  expect(more({ request: 101 as Bytes })).toBe(1_700);
+  expect(more({ response: 1_001 as Bytes })).toBe(1_700);
+  expect(more({ roundtrip: Duration.fromMillis(2_001) })).toBe(10_200);
+  expect(more({ delivered: 2_001 as Bytes })).toBe(31_960);
+
+  // A transform costs the same on every subnet, since it is the one term
+  // priced against the reference subnet size rather than the node count.
+  const transform = (nodes: number): number =>
+    calculators({ subnetSize: nodes }).calculatorCycles.httpOutcallV2({
+      ...USAGE,
+      transformInstructions: 13_000_000 as Instructions,
+    }) -
+    calculators({ subnetSize: nodes }).calculatorCycles.httpOutcallV2(USAGE);
+  expect(transform(13)).toBe(13 * (1_000_000 - 2));
+  expect(transform(34)).toBe(34 * (1_000_000 - 2));
+});
+
+it("should default a flexible outcall to the whole subnet", () => {
+  const cycles = calculators().calculatorCycles;
+
+  // Every node performs the outcall and floor(2 / 3 * 13) + 1 = 9 responses
+  // are required, of which 9 are delivered.
+  expect(
+    cycles.httpOutcallV2({ ...USAGE, replication: Replication.Flexible }),
+  ).toBe(
+    cycles.httpOutcallV2({
+      ...USAGE,
+      replication: Replication.Flexible,
+      totalRequests: 13,
+      minResponses: 9,
+      deliveredResponses: 9,
+    }),
+  );
+});
+
+it("should not charge version 2 for a flexible outcall that delivers nothing", () => {
+  const cycles = calculators().calculatorCycles;
+  // Delivering no response requires requiring none, so the base fee carries
+  // neither of the terms that price the responses consensus has to agree on.
+  const usage = {
+    ...USAGE,
+    replication: Replication.Flexible,
+    totalRequests: 3,
+    minResponses: 0,
+    deliveredResponses: 0,
+  };
+
+  // Fire and forget: the nodes still perform the outcall and gossip, but no
+  // response is put into a block.
+  //   base fee = 13 * (1_000_000 + 50*100 + 90_000*13) = 28_275_000
+  expect(cycles.httpOutcallV2(usage)).toBe(
+    28_275_000 + 3 * (PER_NODE_USAGE_FEE + 50 * 2_000 * 13),
+  );
+  expect(cycles.httpOutcallV2Payment(usage)).toBe(cycles.httpOutcallV2(usage));
+});
+
+it("should bound the version 2 payment by the maximum usage", () => {
+  const cycles = calculators().calculatorCycles;
+
+  //   a 2 MB response, 60 s of round trip, and the full query instruction limit
+  const max = maxHttpOutcallUsage({ request: 100 as Bytes });
+  expect(max.response).toBe(2_000_000);
+  expect(max.delivered).toBe(2_001_024);
+  expect(max.roundtrip?.asMillis()).toBe(60_000);
+  expect(max.transformInstructions).toBe(5_000_000_000);
+
+  // Nothing an outcall that leaves `max_response_bytes` unset can consume costs
+  // more than the payment computed from it.
+  const payment = cycles.httpOutcallV2Payment(max);
+  expect(cycles.httpOutcallV2(max)).toBeLessThan(payment);
+  expect(cycles.httpOutcallV2Payment(USAGE)).toBeLessThan(payment);
+
+  // Capping the response lowers the payment, which is the point of doing so.
+  expect(
+    cycles.httpOutcallV2Payment(
+      maxHttpOutcallUsage({
+        request: 100 as Bytes,
+        maxResponseBytes: 10_000 as Bytes,
+      }),
+    ),
+  ).toBeLessThan(payment);
 });
 
 it("should compute canister creation cost on a 13-node subnet", () => {
@@ -292,6 +529,20 @@ it("should compute system subnet costs as zero", () => {
   expect($.httpOutcall(bytes, bytes)).toBeCloseTo(0);
   expect(cycles.canisterCreation()).toBeCloseTo(0);
   expect($.canisterCreation()).toBeCloseTo(0);
+});
+
+it("should charge version 2 on a system subnet", () => {
+  const cycles = calculators({
+    subnetType: SubnetType.System,
+  }).calculatorCycles;
+
+  // Unlike the version 1 fees, the version 2 ones are not part of the subnet
+  // config, so they are the same on a system subnet as on an application one.
+  // Only a subnet on a free cost schedule pays nothing.
+  expect(cycles.httpOutcall(USAGE.request, USAGE.response)).toBe(0);
+  expect(cycles.httpOutcallV2(USAGE)).toBe(
+    calculators().calculatorCycles.httpOutcallV2(USAGE),
+  );
 });
 
 it("should returns some replica version", () => {

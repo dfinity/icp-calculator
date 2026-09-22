@@ -2,6 +2,7 @@ import { calculator } from "./calculator";
 import type { Calculator, Cycles, SubnetType, USD } from "./types";
 import { toUSD } from "./usd";
 
+export { maxHttpOutcallUsage } from "./calculator";
 export * from "./types";
 
 /**
