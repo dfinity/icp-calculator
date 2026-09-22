@@ -84,6 +84,12 @@ const MAX_TRANSFORM_INSTRUCTIONS = 5_000_000_000;
  * bytes, milliseconds, instructions or nodes that the protocol counts in.
  */
 function bounded(value: number, max: number): number {
+  // An infinity clamps to the bound below, but a value that is not a number
+  // has no place on the range at all, and would otherwise carry through every
+  // fee it touches.
+  if (Number.isNaN(value)) {
+    return 0;
+  }
   return Math.min(Math.max(Math.trunc(value), 0), max);
 }
 
@@ -136,9 +142,13 @@ export function maxHttpOutcallUsage({
   totalRequests?: number;
   minResponses?: number;
 }): HttpOutcallUsage {
-  const response = maxResponseBytes ?? (MAX_HTTP_RESPONSE_BYTES as Bytes);
+  // The largest call there is, so no larger than the protocol permits.
+  const response = bounded(
+    maxResponseBytes ?? MAX_HTTP_RESPONSE_BYTES,
+    MAX_HTTP_RESPONSE_BYTES,
+  ) as Bytes;
   return {
-    request,
+    request: bounded(request, MAX_HTTP_REQUEST_BYTES) as Bytes,
     response,
     delivered: (response + CANDID_OVERHEAD_RESERVE_BYTES) as Bytes,
     roundtrip: Duration.fromMillis(MAX_HTTP_ROUNDTRIP_TIME_MS),

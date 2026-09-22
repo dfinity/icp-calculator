@@ -293,8 +293,10 @@ it("should charge version 2 per node on a 34-node subnet", () => {
   expect(more({ roundtrip: Duration.fromMillis(2_001) })).toBe(10_200);
   expect(more({ delivered: 2_001 as Bytes })).toBe(31_960);
 
-  // A transform costs the same on every subnet, since it is the one term
-  // priced against the reference subnet size rather than the node count.
+  // Every node is charged the same for a transform whatever subnet it is on,
+  // since the instruction count is divided by the reference subnet size rather
+  // than by the node count. What scales with the subnet is only how many nodes
+  // run the transform, which is why the totals below differ.
   const transform = (nodes: number): number =>
     calculators({ subnetSize: nodes }).calculatorCycles.httpOutcallV2({
       ...USAGE,
@@ -473,6 +475,68 @@ it("should price version 2 on a subnet of whole nodes, at least one", () => {
     expect(on(subnetSize)).toBe(on(1));
   }
   expect(on(13.9)).toBe(on(13));
+});
+
+it("should report a maximum usage the protocol would accept", () => {
+  const cycles = calculators().calculatorCycles;
+
+  // The helper describes the largest call there is, so asking it for one
+  // larger than the protocol permits gives the largest one permitted.
+  const beyond = maxHttpOutcallUsage({
+    request: 9_999_999 as Bytes,
+    maxResponseBytes: 9_999_999 as Bytes,
+  });
+  expect(beyond.request).toBe(2_000_000);
+  expect(beyond.response).toBe(2_000_000);
+  expect(beyond.delivered).toBe(2_001_024);
+  expect(cycles.httpOutcallV2Payment(beyond)).toBe(
+    cycles.httpOutcallV2Payment(
+      maxHttpOutcallUsage({
+        request: 2_000_000 as Bytes,
+        maxResponseBytes: 2_000_000 as Bytes,
+      }),
+    ),
+  );
+});
+
+it("should not carry a usage that is not a number into a price", () => {
+  const cycles = calculators().calculatorCycles;
+  const none = {
+    request: 0 as Bytes,
+    response: 0 as Bytes,
+    delivered: 0 as Bytes,
+    roundtrip: Duration.fromMillis(0),
+    transformInstructions: 0 as Instructions,
+  };
+
+  expect(
+    cycles.httpOutcallV2({
+      request: NaN as Bytes,
+      response: NaN as Bytes,
+      delivered: NaN as Bytes,
+      roundtrip: Duration.fromMillis(NaN),
+      transformInstructions: NaN as Instructions,
+    }),
+  ).toBe(cycles.httpOutcallV2(none));
+
+  // An infinity is a value on the range, so it clamps to the top of it.
+  expect(
+    cycles.httpOutcallV2({
+      ...none,
+      response: Infinity as Bytes,
+      delivered: Infinity as Bytes,
+      roundtrip: Duration.fromMillis(Infinity),
+      transformInstructions: Infinity as Instructions,
+    }),
+  ).toBe(
+    cycles.httpOutcallV2({
+      ...none,
+      response: 2_000_000 as Bytes,
+      delivered: 2_001_024 as Bytes,
+      roundtrip: Duration.fromMillis(60_000),
+      transformInstructions: 5_000_000_000 as Instructions,
+    }),
+  );
 });
 
 it("should not charge version 2 for a flexible outcall that delivers nothing", () => {
