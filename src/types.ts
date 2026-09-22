@@ -32,9 +32,15 @@ export class Duration {
     return this.seconds;
   }
 
+  /**
+   * The duration as a whole number of milliseconds, which is the unit the
+   * protocol counts elapsed time in. Rounded, because a duration constructed
+   * from milliseconds is held in seconds and so need not come back out as the
+   * exact integer it went in as.
+   */
   asMillis(): number {
     const MILLIS_PER_SECOND = 1000;
-    return this.seconds * MILLIS_PER_SECOND;
+    return Math.round(this.seconds * MILLIS_PER_SECOND);
   }
 
   static fromSeconds(seconds: number): Duration {

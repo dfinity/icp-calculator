@@ -451,6 +451,30 @@ it("should price version 2 for a call the protocol could have accepted", () => {
   );
 });
 
+it("should price every millisecond of round trip", () => {
+  const cycles = calculators().calculatorCycles;
+  const at = (ms: number): number =>
+    cycles.httpOutcallV2({ ...USAGE, roundtrip: Duration.fromMillis(ms) });
+
+  // At 300 cycles per millisecond per node, on 13 of them.
+  for (const ms of [1_001, 1_002, 1_003, 1_999, 2_001]) {
+    expect(at(ms) - at(1_000)).toBe((ms - 1_000) * 3_900);
+  }
+});
+
+it("should price version 2 on a subnet of whole nodes, at least one", () => {
+  const on = (subnetSize: number): number =>
+    calculators({ subnetSize }).calculatorCycles.httpOutcallV2(USAGE);
+
+  // A subnet has a whole number of nodes and cannot have none, so a size that
+  // is neither prices as the subnet the protocol could have had.
+  expect(on(1)).toBeGreaterThan(0);
+  for (const subnetSize of [0, 0.5, -5]) {
+    expect(on(subnetSize)).toBe(on(1));
+  }
+  expect(on(13.9)).toBe(on(13));
+});
+
 it("should not charge version 2 for a flexible outcall that delivers nothing", () => {
   const cycles = calculators().calculatorCycles;
   // Delivering no response requires requiring none, so the base fee carries

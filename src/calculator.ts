@@ -157,6 +157,8 @@ interface ResolvedUsage {
   roundtripMs: number;
   transformInstructions: number;
   replication: Replication;
+  /** How many nodes the subnet has, which every fee is priced against. */
+  subnetNodes: number;
   /** How many nodes perform the outcall. */
   nodes: number;
   minResponses: number;
@@ -312,7 +314,9 @@ class CalculatorImpl implements Calculator<Cycles> {
    */
   private resolveUsage(usage: HttpOutcallUsage): ResolvedUsage {
     const replication = usage.replication ?? Replication.FullyReplicated;
-    const subnetNodes = Math.max(this.subnetSize, 1);
+    // Every version 2 fee is priced against this, so it is decided once here
+    // rather than read off the calculator in each of them.
+    const subnetNodes = Math.max(Math.trunc(this.subnetSize), 1);
     const nodes = {
       [Replication.FullyReplicated]: subnetNodes,
       [Replication.NonReplicated]: 1,
@@ -346,6 +350,7 @@ class CalculatorImpl implements Calculator<Cycles> {
         MAX_TRANSFORM_INSTRUCTIONS,
       ),
       replication,
+      subnetNodes,
       nodes,
       minResponses,
       deliveredResponses: bounded(
@@ -357,7 +362,7 @@ class CalculatorImpl implements Calculator<Cycles> {
 
   /** The fee charged up-front for every request. */
   private baseFeeV2(u: ResolvedUsage): number {
-    const n = this.subnetSize;
+    const n = u.subnetNodes;
     const perRequest =
       HTTP_REQUEST_BASE_FEE + HTTP_REQUEST_PER_BYTE_FEE * u.request;
     if (u.replication === Replication.FullyReplicated) {
@@ -388,7 +393,7 @@ class CalculatorImpl implements Calculator<Cycles> {
     const gossip =
       u.replication === Replication.FullyReplicated
         ? 0
-        : FLEXIBLE_PER_TRANSFORMED_BYTE_NODE_FEE * gossiped * this.subnetSize;
+        : FLEXIBLE_PER_TRANSFORMED_BYTE_NODE_FEE * gossiped * u.subnetNodes;
     return (
       PER_DOWNLOADED_BYTE_FEE * u.response +
       PER_RESPONSE_MS_FEE * u.roundtripMs +
@@ -398,14 +403,17 @@ class CalculatorImpl implements Calculator<Cycles> {
   }
 
   /** The fee for putting `bytes` many response bytes into a block. */
-  private consensusFeeV2(bytes: number): number {
-    const n = this.subnetSize;
+  private consensusFeeV2(u: ResolvedUsage, bytes: number): number {
+    const n = u.subnetNodes;
     return (CONSENSUS_PER_NODE_BYTE_FEE * n + CONSENSUS_BYTE_FEE) * n * bytes;
   }
 
   /** The surcharge for flexible responses beyond the ones consensus requires. */
-  private flexibleExtraResponseFeeV2(extraResponses: number): number {
-    const n = this.subnetSize;
+  private flexibleExtraResponseFeeV2(
+    u: ResolvedUsage,
+    extraResponses: number,
+  ): number {
+    const n = u.subnetNodes;
     return (
       (HTTP_REQUEST_FLEXIBLE_PER_NODE_RESPONSE_CONSENSUS_FEE * n +
         HTTP_REQUEST_FLEXIBLE_PER_RESPONSE_CONSENSUS_FEE) *
@@ -417,7 +425,7 @@ class CalculatorImpl implements Calculator<Cycles> {
   /** What delivering the results of the outcall is actually charged. */
   private deliveryFeeV2(u: ResolvedUsage): number {
     if (u.replication !== Replication.Flexible) {
-      return this.consensusFeeV2(u.delivered);
+      return this.consensusFeeV2(u, u.delivered);
     }
     const delivered = u.deliveredResponses;
     if (delivered === 0) {
@@ -426,8 +434,9 @@ class CalculatorImpl implements Calculator<Cycles> {
     }
     return (
       this.consensusFeeV2(
+        u,
         delivered * (FLEXIBLE_RESPONSE_SIZE_OVERHEAD + u.delivered),
-      ) + this.flexibleExtraResponseFeeV2(delivered - u.minResponses)
+      ) + this.flexibleExtraResponseFeeV2(u, delivered - u.minResponses)
     );
   }
 
@@ -439,15 +448,17 @@ class CalculatorImpl implements Calculator<Cycles> {
   private maxDeliveryFeeV2(u: ResolvedUsage, deliverable: number): number {
     switch (u.replication) {
       case Replication.NonReplicated:
-        return this.consensusFeeV2(deliverable);
+        return this.consensusFeeV2(u, deliverable);
       case Replication.FullyReplicated: {
         // Only a quorum of the nodes contributes to the result, but the reserve
         // is split across the whole subnet, so each contributor has to hold the
         // share of the delivery that the quorum leaves it.
         const n = u.nodes;
         return (
-          divCeil(this.consensusFeeV2(deliverable), canisterHttpThreshold(n)) *
-          n
+          divCeil(
+            this.consensusFeeV2(u, deliverable),
+            canisterHttpThreshold(n),
+          ) * n
         );
       }
       case Replication.Flexible: {
@@ -460,8 +471,9 @@ class CalculatorImpl implements Calculator<Cycles> {
         const responses = Math.max(u.nodes, 1);
         return (
           this.consensusFeeV2(
+            u,
             responses * (FLEXIBLE_RESPONSE_SIZE_OVERHEAD + deliverable),
-          ) + this.flexibleExtraResponseFeeV2(responses - u.minResponses)
+          ) + this.flexibleExtraResponseFeeV2(u, responses - u.minResponses)
         );
       }
     }
